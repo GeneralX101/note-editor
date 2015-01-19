@@ -1,0 +1,15 @@
+.ql-paste-manager {
+    left: -10000px;
+    position: absolute;
+    top: 50%;
+}
+
+#sections {
+    margin-left: 14px;
+    width: 400px;
+}
+
+.section {
+    border: 1px solid #ccc;
+    padding: 6px;
+}

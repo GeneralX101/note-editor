@@ -1,0 +1,19 @@
+[
+  {
+    "id": 1231,
+    "section_type": "text",
+    "content": "<div>This is the start of the note</div>"
+  },
+  {
+    "id": 43894,
+    "section_type": "citation",
+    "document": "http://example.com/document12309",
+    "document_description": "<div>Goldman, Emma. <i>Living My Life</i>.",
+    "content": null,
+  },
+  {
+    "id": 12,
+    "section_type": "text",
+    "content": "<div><div>and....</div><div>This is the the last of the note</div></div>"
+  },
+]
