@@ -16,6 +16,12 @@ pre {
 }
 
 .section {
-    border: 1px solid #ccc;
     padding: 6px;
+}
+.section[data-section-type="citation"] {
+    border: 1px solid #ccc;
+}
+
+.section * {
+    outline: none;
 }

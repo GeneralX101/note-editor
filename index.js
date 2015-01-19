@@ -6,6 +6,7 @@ var Quill = require('quill')
 
 var keys = {
   BACKSPACE: 8,
+  ENTER: 13,
   LEFT_ARROW: 37,
   UP_ARROW: 38,
   RIGHT_ARROW: 39,
@@ -205,7 +206,8 @@ var SectionCollectionView = Backbone.View.extend({
 
     section = typeof section !== 'object' ? this.collection.get(section) : section;
 
-    el = this.elBySection[section.cid]
+    el = this.elBySection[section.cid];
+    el.classList.add('editing');
     editor = new Quill(el.querySelector('.content'), {
       pollInterval: 1000,
       styles: false
@@ -232,8 +234,6 @@ var SectionCollectionView = Backbone.View.extend({
 
     if (offset < 0) offset = 0;
     editor.setSelection(offset, offset);
-
-    sectionEl.classList.add('editing');
   },
   handleKeydown: function (e) {
     var curSection
@@ -270,9 +270,42 @@ var SectionCollectionView = Backbone.View.extend({
         this.switchToSection(this.collection.at(idx + 1), true, lineOffset);
       }
       break;
+    case (keys.ENTER):
+      curSection = this._sectionForEl(e.target);
+      editor = this.editorBySection[curSection.cid];
+      var selection = editor.getSelection();
+      var length = editor.getLength();
+      if (curSection.section_type !== 'text' && selection.start > 0 && editor.getText(selection.start - 1) === '\n\n') {
+        editor.setSelection(null);
+        editor.updateContents({
+          startLength: length,
+          endLelength: length - 1,
+          ops: [
+            { retain: length - 1 },
+            { delete: 1 }
+          ]
+        });
+        setTimeout(this.switchToTextBelow.bind(this, curSection))
+        return false;
+      }
+      return true;
+      break;
     default:
+      return true;
       break;
     }
+  },
+  switchToTextBelow: function (section) {
+    var idx = this.collection.indexOf(section) + 1
+      , switchTo = this.collection.at(idx)
+
+    if (!switchTo || switchTo.section_type !== 'text') {
+      switchTo = makeSection({ section_type: 'text' });
+      this.collection.add(switchTo, { at: idx });
+      this._addSection(switchTo);
+    }
+
+    this.switchToSection(switchTo, true, 0);
   },
   switchToSection: function (section, toTop, lineOffset) {
     var editor = this.editorBySection[section.cid] || this.makeEditor(section)
