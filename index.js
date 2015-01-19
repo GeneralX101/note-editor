@@ -12,18 +12,22 @@ var keys = {
   DOWN_ARROW: 40
 }
 
+function makeSection(data) {
+  var section;
+  if (data.section_type === 'text') {
+    section = new TextSection(data);
+  } else if (data.section_type === 'citation') {
+    section = new CitationSection(data);
+  }
+  return section;
+}
 
 function init() {
   var collection = new SectionCollection()
     , data = require('./data.json')
 
   data.forEach(function (sectionData) {
-    var section;
-    if (sectionData.section_type === 'text') {
-      section = new TextSection(sectionData);
-    } else if (sectionData.section_type === 'citation') {
-      section = new CitationSection(sectionData);
-    }
+    var section = makeSection(sectionData);
     collection.add(section);
   });
 
@@ -117,28 +121,74 @@ var SectionCollectionView = Backbone.View.extend({
     'keydown': 'handleKeydown'
   },
   initialize: function () {
+    var that = this;
+
     this.editorBySection = {};
     this.elBySection = {};
     this.render();
-  },
-  render: function () {
-    this.collection.forEach(function (section) {
-      var newEl = $('<div class="section">')
-      newEl[0].dataset.sectionType = section.section_type;
-      newEl[0].dataset.cid = section.cid;
 
-      if (section.section_type === 'citation') {
+    this._updatePre();
+    this.collection.on('change', this._updatePre.bind(this));
+
+    document.querySelector('#toolbar').addEventListener('click', function () {
+      var section = makeSection({ section_type: 'citation' });
+      var focused = window.getSelection().focusNode;
+      var currentSection = closest(focused, 'section');
+      var idx = null;
+      if (currentSection) {
+        currentSection = that.collection.get(currentSection.dataset.cid);
+        idx = that.collection.indexOf(currentSection) + 1;
+      }
+      that.collection.add(section, { at: idx });
+      that._addSection(section);
+      that.elBySection[section.cid].querySelector('input').focus();
+    });
+  },
+  _updatePre: function (collection) {
+    $('pre').text(JSON.stringify(this.collection, true, '  '));
+  },
+  _addSection: function (section) {
+    var that = this
+      , newEl = $('<div class="section">')
+      , idx = this.collection.indexOf(section)
+      , before
+
+    newEl[0].dataset.sectionType = section.section_type;
+    newEl[0].dataset.cid = section.cid;
+
+    if (section.section_type === 'citation') {
+      if (section.has('document') && section.get('document')) {
         newEl.append(
           '<div><a href="#' + section.get('document') + '">' +
           section.get('document_description') + '</a></div>')
+      } else {
+        newEl.append(
+          '<div><input type="text" placeholder="Document title"></input> ' +
+          '<button>OK</button></div>')
+        newEl.find('button').one('click', function () {
+          var $parent = $(this.parentNode);
+          var val = $parent.find('input').val();
+          section.set('document_description', val);
+          section.set('document', 'http://example.com/' + Math.random());
+          $(this.parentNode).replaceWith(
+            '<div><a href="#' + section.get('document') + '">' +
+            section.get('document_description') + '</a></div>')
+          that.switchToSection(section, true, 0);
+        });
       }
+    }
 
-      console.log(section.get('content'));
-      newEl.append('<div class="content">' + (section.get('content') || '') + '</div>');
-      this.elBySection[section.cid] = newEl[0];
+    newEl.append('<div class="content">' + (section.get('content') || '') + '</div>');
+    this.elBySection[section.cid] = newEl[0];
 
-      this.$el.append(newEl);
-    }, this);
+    if (idx === 0) {
+      this.$el.prepend(newEl);
+    } else {
+      newEl.insertAfter(this.elBySection[this.collection.at(idx - 1).cid]);
+    }
+  },
+  render: function () {
+    this.collection.forEach(this._addSection, this);
   },
   _sectionForEl: function (el) {
     var sectionEl = closest(el, 'section')
@@ -159,8 +209,11 @@ var SectionCollectionView = Backbone.View.extend({
     editor = new Quill(el.querySelector('.content'), {
       pollInterval: 1000,
       styles: false
-    })
-    //editor.addModule('toolbar')
+    });
+
+    editor.on('text-change', function () {
+      section.set('content', editor.getHTML());
+    });
 
     this.editorBySection[section.cid] = editor;
     return editor;
@@ -172,6 +225,7 @@ var SectionCollectionView = Backbone.View.extend({
 
     if (sectionEl.dataset.noEdit) return;
     if (sectionEl.classList.contains('editing')) return;
+    if (e.target.nodeName === 'INPUT') return;
 
     offset = getTextPositionOffset(sectionEl.querySelector('.content'));
     editor = this.makeEditor(sectionEl.dataset.cid);

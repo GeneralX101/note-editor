@@ -4,9 +4,15 @@
     top: 50%;
 }
 
-#sections {
+#sections, pre {
+    float: left;
     margin-left: 14px;
     width: 400px;
+}
+
+pre {
+    font-size: 10px;
+    overflow-x: scroll;
 }
 
 .section {
