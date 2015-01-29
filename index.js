@@ -13,6 +13,25 @@ var keys = {
   DOWN_ARROW: 40
 }
 
+/*
+Quill.registerModule('spacing', function (quill, options) {
+  var selection;
+  var zerospace = document.createTextNode('\u200B');
+  var firstLine = quill.root.children[0];
+  firstLine.insertBefore(zerospace, firstLine.childNodes[0]);
+  quill.root.addEventListener('keydown', function (e) {
+    if (e.which === 8) {
+      selection = quill.getSelection();
+      if (selection.start === 0 && selection.end === 0) {
+        console.log('backspace at beginning');
+      }
+    }
+  });
+});
+*/
+
+Quill.registerModule('spacing', require('./quill_spacing'));
+
 function makeSection(data) {
   var section;
   if (data.section_type === 'text') {
@@ -212,6 +231,8 @@ var SectionCollectionView = Backbone.View.extend({
       pollInterval: 1000,
       styles: false
     });
+    editor.addModule('spacing');
+    this.addKeyboardListeners(editor, section);
 
     editor.on('text-change', function () {
       section.set('content', editor.getHTML());
@@ -235,6 +256,42 @@ var SectionCollectionView = Backbone.View.extend({
     if (offset < 0) offset = 0;
     editor.setSelection(offset, offset);
   },
+  addKeyboardListeners: function (editor, section) {
+    var that = this;
+
+    editor.on('up-on-top-line', function (offset, kbdEvent) {
+      var idx = that.collection.indexOf(section);
+      if (idx === 0) return;
+      kbdEvent.preventDefault();
+      editor.setSelection(null);
+      that.switchToSection(that.collection.at(idx - 1), false, offset);
+    });
+
+    editor.on('left-at-origin', function (kbdEvent) {
+      var idx = that.collection.indexOf(section);
+      if (idx === 0) return;
+      kbdEvent.preventDefault();
+      editor.setSelection(null);
+      that.switchToSection(that.collection.at(idx - 1), false, 99999);
+    });
+
+    editor.on('down-on-bottom-line', function (offset, kbdEvent) {
+      var idx = that.collection.indexOf(section);
+      if (idx === that.collection.length - 1) return;
+      kbdEvent.preventDefault();
+      editor.setSelection(null);
+      that.switchToSection(that.collection.at(idx + 1), true, offset);
+    });
+
+    editor.on('right-at-terminus', function (kbdEvent) {
+      var idx = that.collection.indexOf(section);
+      if (idx === that.collection.length - 1) return;
+      kbdEvent.preventDefault();
+      editor.setSelection(null);
+      that.switchToSection(that.collection.at(idx + 1), true, 0);
+    });
+
+  },
   handleKeydown: function (e) {
     var curSection
       , editor
@@ -242,34 +299,6 @@ var SectionCollectionView = Backbone.View.extend({
       , lineOffset
 
     switch (e.which) {
-    case (keys.LEFT_ARROW):
-      break;
-    case (keys.RIGHT_ARROW):
-      break;
-    case (keys.UP_ARROW):
-      curSection = this._sectionForEl(e.target);
-      editor = this.editorBySection[curSection.cid];
-      if (selectionInTopLine(editor)) {
-        idx = this.collection.indexOf(curSection);
-        if (idx === 0) break;
-        lineOffset = editor.getSelection().start;
-        editor.setSelection(null);
-        this.switchToSection(this.collection.at(idx -1), false, lineOffset);
-      }
-      break;
-    case (keys.DOWN_ARROW):
-      curSection = this._sectionForEl(e.target);
-      editor = this.editorBySection[curSection.cid];
-      if (selectionInBottomLine(editor)) {
-        idx = this.collection.indexOf(curSection);
-        if (idx === this.collection.length - 1) break;
-        var lastLine = getLine(editor, false);
-        lineOffset = getLine(editor, false).length
-          - (editor.getLength() - 1 - editor.getSelection().start)
-        editor.setSelection(null);
-        this.switchToSection(this.collection.at(idx + 1), true, lineOffset);
-      }
-      break;
     case (keys.ENTER):
       curSection = this._sectionForEl(e.target);
       editor = this.editorBySection[curSection.cid];
